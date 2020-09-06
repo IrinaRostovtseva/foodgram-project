@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}Избранное{% endblock %}
+
+{% block styles %}
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'pages/index.css' %}">
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+    <div class="main__header">
+        <h1 class="main__title">Избранное</h1>
+        {% include 'tags.html' %}
+    </div>
+    <div class="card-list">
+        {% for card in page %}
+            {% include 'recipe_card.html' with card=card %}
+        {% endfor %}
+    </div>
+    {% include 'paginator.html' with page=page paginator=paginator %}
+{% endblock %}
+{% block javascript %}
+    {% load static %}
+    <script src="{% static 'js/components/MainCards.js' %}"></script>
+    <script src="{% static 'js/components/Purchpurachases.js' %}"></script>
+    <script src="{% static 'js/components/Favorites.js' %}"></script>
+    <script src="{% static 'js/components/CardList.js' %}"></script>
+    <script src="{% static 'js/components/Header.js' %}"></script>
+    <script src="{% static 'js/api/Api.js' %}"></script>
+    <script src="{% static 'js/indexAuth.js' %}"></script>
+{% endblock %}
