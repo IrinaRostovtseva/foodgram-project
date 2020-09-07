@@ -31,10 +31,16 @@ def index(request):
         'paginator': paginator
     }
     if request.user.is_authenticated:
-        purchase = Purchase.objects.get(user=request.user)
-        shop_count = purchase.recipes.count()
-        favorite = get_object_or_404(Favorite, user=request.user)
-        context['favorites'] = favorite.recipes.all()
+        if Purchase.objects.filter(user=request.user).exists():
+            purchase = Purchase.objects.get(user=request.user)
+            shop_count = purchase.recipes.count()
+        else:
+            shop_count = 0
+        if Favorite.objects.filter(user=request.user).exists():
+            favorite = Favorite.objects.get(user=request.user)
+            context['favorites'] = favorite.recipes.all()
+        else:
+            context['favorites'] = []
         context['shop_count'] = shop_count
     return render(request, 'index.html', context)
 
@@ -43,8 +49,6 @@ def profile(request, user_id):
     if request.method == 'GET':
         tag = request.GET.get('tag')
         profile = get_object_or_404(User, id=user_id)
-        favorite = get_object_or_404(Favorite, user=request.user)
-        is_subscribed = Subscription.objects.filter(user__id=user_id, author=profile).exists()
         if tag is None:
             recipes_list = Recipe.objects.filter(
                 author__id=user_id).order_by('-pub_date')
@@ -56,15 +60,23 @@ def profile(request, user_id):
         page = paginator.get_page(page_number)
         context = {
             'profile': profile,
-            'is_subscribed': is_subscribed,
             'page': page,
             'paginator': paginator
         }
+        # Если юзер авторизован добавляет в контекст счетчик покупок и избранное
         if request.user.is_authenticated:
-            favorite = get_object_or_404(Favorite, user=request.user)
-            purchase = Purchase.objects.get(user=request.user)
-            shop_count = purchase.recipes.count()
-            context['favorites'] = favorite.recipes.all()
+            is_subscribed = Subscription.objects.filter(user__id=user_id, author=profile).exists()
+            if Purchase.objects.filter(user=request.user).exists():
+                purchase = Purchase.objects.get(user=request.user)
+                shop_count = purchase.recipes.count()
+            else:
+                shop_count = 0
+            if Favorite.objects.filter(user=request.user).exists():
+                favorite = Favorite.objects.get(user=request.user)
+                context['favorites'] = favorite.recipes.all()
+            else:
+                context['favorites'] = []
+            context['is_subscribed'] = is_subscribed
             context['shop_count'] = shop_count
         return render(request, 'profile.html', context)
 
@@ -78,11 +90,17 @@ def recipe_detail(request, recipe_id):
         }
         if request.user.is_authenticated:
             is_subscribed = Subscription.objects.filter(
-                user=request.user, author=author)
-            favorite = Favorite.objects.get(user=request.user)
-            is_favorite = favorite.recipes.filter(id=recipe_id)
-            purchase = Purchase.objects.get(user=request.user)
-            shop_count = purchase.recipes.count()
+                user=request.user, author=author).exists()
+            if Purchase.objects.filter(user=request.user).exists():
+                purchase = Purchase.objects.get(user=request.user)
+                shop_count = purchase.recipes.count()
+            else:
+                shop_count = 0
+            if Favorite.objects.filter(user=request.user).exists():
+                favorite = Favorite.objects.get(user=request.user)
+                is_favorite = favorite.recipes.filter(id=recipe_id).exists()
+            else:
+                is_favorite = False
             context['is_subscribed'] = is_subscribed
             context['is_favorite'] = is_favorite
             context['shop_count'] = shop_count
@@ -91,28 +109,35 @@ def recipe_detail(request, recipe_id):
 
 @login_required
 def favorite(request):
+    # GET-запрос на страницу с избранными рецептами
     if request.method == 'GET':
         tag = request.GET.get('tag')
         auth_user = get_object_or_404(User, username=request.user.username)
-        favorite = Favorite.objects.get(user=auth_user)
-        if tag is None:
-            recipes_list = favorite.recipes.all().order_by('pub_date')
+        if Favorite.objects.filter(user=auth_user).exists():
+            favorite = Favorite.objects.get(user=auth_user)
+            if tag is None:
+                recipes_list = favorite.recipes.all().order_by('pub_date')
+            else:
+                recipes_list = favorite.recipes.filter(
+                    tags__slug=tag).order_by('pub_date')
         else:
-            recipes_list = favorite.recipes.filter(
-                tags__slug=tag).order_by('pub_date')
-        purchase = Purchase.objects.get(user=request.user)
-        shop_count = purchase.recipes.count()
+            recipes_list = []
+        if Purchase.objects.filter(user=request.user).exists():
+            purchase = Purchase.objects.get(user=request.user)
+            shop_count = purchase.recipes.count()
+        else:
+            shop_count = 0
         paginator = Paginator(recipes_list, 3)
         page_number = request.GET.get('page')
         page = paginator.get_page(page_number)
         context = {
             'tag': tag,
-            'favorites': favorite.recipes.all(),
             'shop_count': shop_count,
             'paginator': paginator,
             'page': page
         }
         return render(request, 'favorites.html', context)
+    # POST-запрос на добавление в избранное 
     elif request.method == 'POST':
         json_data = json.loads(request.body.decode())
         recipe_id = int(json_data['id'])
@@ -156,9 +181,15 @@ def delete_favorite(request, recipe_id):
 def get_subscriptions(request):
     if request.method == 'GET':
         auth_user = get_object_or_404(User, username=request.user.username)
-        subscriptions = Subscription.objects.filter(user=auth_user)
-        purchase = Purchase.objects.get(user=request.user)
-        shop_count = purchase.recipes.count()
+        if Subscription.objects.filter(user=auth_user).exists():
+            subscriptions = Subscription.objects.filter(user=auth_user)
+        else:
+            subscriptions = []
+        if Purchase.objects.filter(user=request.user).exists():
+            purchase = Purchase.objects.get(user=request.user)
+            shop_count = purchase.recipes.count()
+        else:
+            shop_count = 0
         page_num = request.GET.get('page')
         paginator = Paginator(subscriptions, 3)
         page = paginator.get_page(page_num)
@@ -206,17 +237,22 @@ def delete_subscription(request, author_id):
 
 @login_required
 def purchase(request):
+    # GET-запрос на страницу со списком покупок
     if request.method == 'GET':
         user = get_object_or_404(User, id=request.user.id)
         is_list_exist = Purchase.objects.filter(user=user).exists()
-        purchase = Purchase.objects.get(user=request.user)
-        shop_count = purchase.recipes.count()
-        context = {'shop_count': shop_count}
+        context = {}
         if is_list_exist:
             purchase = Purchase.objects.get(user=user)
             recipes_list = purchase.recipes.all()
-            context['recipes_list'] = recipes_list
+            shop_count = purchase.recipes.count()
+        else:
+            recipes_list = []
+            shop_count = 0
+        context['recipes_list'] = recipes_list
+        context['shop_count'] = shop_count
         return render(request, 'purchases.html', context)
+    # POST-запрос на добавление рецепта в список покупок
     if request.method == 'POST':
         json_data = json.loads(request.body.decode())
         recipe_id = int(json_data['id'])
@@ -354,3 +390,8 @@ def delete_recipe(request, recipe_id):
         recipe = get_object_or_404(Recipe, id=recipe_id)
         recipe.delete()
         return redirect('index')
+
+
+def page_not_found(request, exception):
+    context = {"path": request.path}
+    return render(request, 'misc/404.html', context, status=404)
