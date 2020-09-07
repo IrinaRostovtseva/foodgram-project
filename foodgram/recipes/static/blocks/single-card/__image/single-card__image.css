@@ -1,0 +1,10 @@
+.single-card__image {
+    object-fit: cover;
+    align-self: flex-start;
+    height: 480px;
+    width: 480px;
+    left: 135px;
+    top: 128px;
+    display: block;
+    border-radius: 16px;
+}
