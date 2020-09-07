@@ -34,7 +34,7 @@
                     <ul class="single-card__items">
                         <li class="single-card__item"><p class="single-card__text"><span class="icon-user"></span>{{ recipe.author }}</p></li>
                         {% if request.user == recipe.author %}
-                            <li class="single-card__item">  <a style="margin-left: 2.5em" href="" class="single-card__text">Редактировать рецепт</a></li>
+                            <li class="single-card__item">  <a style="margin-left: 2.5em" href="{% url 'edit_recipe' recipe_id=recipe.id %}" class="single-card__text">Редактировать рецепт</a></li>
                         {% endif %}
                     </ul>
                 {% else %}
@@ -57,7 +57,7 @@
             </div>
             <div class="single-card__section">
                 <h3 class="single-card__section-title">Описание:</h3>
-                <p class=" single-card__section-text">{{ recipe.description }}</p>
+                <p class="single-card__section-text">{{ recipe.description }}</p>
             </div>
         </div>
     </div>
