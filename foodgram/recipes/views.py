@@ -12,7 +12,7 @@ from users.models import Subscription
 
 from .create_file import write_into_file
 from .forms import RecipeForm
-from .models import Favorite, Purchase, Recipe, User, Product, Ingredient
+from .models import Favorite, Purchase, Recipe, User, Product, Ingredient, Tag
 
 
 def index(request):
@@ -44,17 +44,19 @@ def profile(request, user_id):
         tag = request.GET.get('tag')
         profile = get_object_or_404(User, id=user_id)
         favorite = get_object_or_404(Favorite, user=request.user)
+        is_subscribed = Subscription.objects.filter(user__id=user_id, author=profile).exists()
         if tag is None:
             recipes_list = Recipe.objects.filter(
                 author__id=user_id).order_by('-pub_date')
         else:
             recipes_list = Recipe.objects.filter(
                 author__id=user_id, tags__slug=tag).order_by('-pub_date')
-        paginator = Paginator(recipes_list, 6)
+        paginator = Paginator(recipes_list, 3)
         page_number = request.GET.get('page')
         page = paginator.get_page(page_number)
         context = {
             'profile': profile,
+            'is_subscribed': is_subscribed,
             'page': page,
             'paginator': paginator
         }
@@ -173,31 +175,31 @@ def subscription(request):
     if request.method == 'POST':
         json_data = json.loads(request.body.decode())
         auth_user = get_object_or_404(User, username=request.user.username)
-        recipe_id = int(json_data['id'])
-        recipe = get_object_or_404(Recipe, id=recipe_id)
+        author_id = int(json_data['id'])
+        author = get_object_or_404(User, id=author_id)
         is_exist = Subscription.objects.filter(
-            user=auth_user, author=recipe.author).exists()
+            user=auth_user, author=author).exists()
         data = {'success': 'true'}
         if is_exist:
             data['success'] = 'false'
         else:
-            Subscription.objects.create(user=auth_user, author=recipe.author)
+            Subscription.objects.create(user=auth_user, author=author)
         return JsonResponse(data)
 
 
 @login_required
-def delete_subscription(request, recipe_id):
+def delete_subscription(request, author_id):
     if request.method == 'DELETE':
         auth_user = get_object_or_404(User, id=request.user.id)
-        recipe = get_object_or_404(Recipe, id=recipe_id)
+        author = get_object_or_404(User, id=author_id)
         is_exist = Subscription.objects.filter(
-            user=auth_user, author=recipe.author).exists()
+            user=auth_user, author=author).exists()
         data = {'success': 'true'}
         if not is_exist:
             data['success'] = 'false'
         else:
             follow = Subscription.objects.filter(
-                user=auth_user, author=recipe.author)
+                user=auth_user, author=author)
             follow.delete()
         return JsonResponse(data)
 
@@ -276,6 +278,8 @@ def new_recipe(request):
     if request.method == 'GET':
         form = RecipeForm()
         context = {
+            'page_title': 'Создание рецепта',
+            'button_label': 'Создать рецепт',
             'form': form
         }
         return render(request, 'recipe_form.html', context)
@@ -288,18 +292,15 @@ def new_recipe(request):
             products = [Product.objects.get(
                 title=title) for title in request.POST.getlist('nameIngredient')]
             amounts = request.POST.getlist('valueIngredient')
-            tags_names = set('breakfast', 'lunch', 'dinner')
-            tags = [Tag.objects.get(slug=item) for item in request.POST.keys() if item in tags_names]
-            recipe = Recipe.objects(
-                author=request.user, name=request.POST.get('name'))
-            if tags:
-                recipe.add(*tags)
+            item = Recipe.objects.get(name=form.cleaned_data['name'])
             for i in range(len(amounts)):
                 ingredient = Ingredient(
-                    recipe=recipe, ingredient=products[i], amount=amounts[i])
+                    recipe=item, ingredient=products[i], amount=amounts[i])
                 ingredient.save()
             return redirect('index')
         context = {
+            'page_title': 'Создание рецепта',
+            'button_label': 'Создать рецепт',
             'form': form
         }
         return render(request, 'recipe_form.html', context)
@@ -313,3 +314,43 @@ def get_ingredients(request):
         data = [{'title': ingredient.title, 'dimension': ingredient.unit}
                 for ingredient in ingredients]
         return JsonResponse(data, safe=False)
+
+
+@login_required
+def edit_recipe(request, recipe_id):
+    recipe = get_object_or_404(Recipe, id=recipe_id)
+    ingredients = recipe.ingredient_set.all()
+    if request.method == 'GET':
+        form = RecipeForm(instance=recipe)
+        context = {
+            'recipe_id': recipe_id,
+            'page_title': 'Редактирование рецепта',
+            'button_label': 'Сохранить',
+            'ingredients': ingredients,
+            'form': form
+        }
+        return render(request, 'recipe_form.html', context)
+    elif request.method == 'POST':
+        form = RecipeForm(request.POST or None, files=request.FILES or None, instance=recipe)
+        if form.is_valid():
+            form.save()
+            ing_set = set(ingredients)
+            new_ing = {Product.objects.get(
+                title=name) for name in request.POST.getlist('nameIngredient')}
+            ing_to_add = list(new_ing.difference(ing_set))
+            ing_to_delete = list(ing_set.difference(new_ing))
+            amounts = request.POST.getlist('valueIngredient')
+            for i in range(len(amounts)):
+                ingredient = Ingredient(
+                    recipe=recipe, ingredient=ing_to_add[i], amount=amounts[i])
+                ingredient.save()
+            recipe.ingredients.remove(*ing_to_delete)
+            return redirect('index')
+
+
+@login_required
+def delete_recipe(request, recipe_id):
+    if request.method == 'GET':
+        recipe = get_object_or_404(Recipe, id=recipe_id)
+        recipe.delete()
+        return redirect('index')
