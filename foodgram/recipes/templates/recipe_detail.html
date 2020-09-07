@@ -9,7 +9,7 @@
 {% block content %}
 {% csrf_token %}
 {% load thumbnail %}
-    <div class="single-card" data-id="{{ recipe.id }}">
+    <div class="single-card" data-id="{{ recipe.id }}" author-id="{{ recipe.author.id }}">
         {% thumbnail recipe.image '480x480' crop="center" upscale=True as im %}
         <img src="{{ im.url }}" alt="recipe.name" width="480" height="480" class="single-card__image">
         {% endthumbnail %}

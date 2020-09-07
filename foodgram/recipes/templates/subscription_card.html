@@ -1,5 +1,5 @@
 {% load thumbnail user_filters %}
-<div class="card-user" data-id="{{ card.author.recipe_author.first.id }}">
+<div class="card-user" author-id="{{ card.author.id }}">
     <div class="card-user__header">
         <h2 class="card-user__title">{{ card.author }}</h2>
     </div>
