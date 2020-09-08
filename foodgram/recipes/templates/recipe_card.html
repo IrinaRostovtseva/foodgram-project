@@ -1,16 +1,16 @@
-{% load thumbnail %}
+{% load thumbnail user_filters %}
 {% csrf_token %}
 <div class="card" data-id="{{ card.id }}">
-    <a href="{% url 'recipe' recipe_id=card.id %}" class="link" target="_blank">
+    <a href="{% url 'recipe' recipe_id=card.id %}" class="link">
         {% thumbnail card.image "364x240" crop="center" upscale=True as im %}
         <img src="{{ im.url }}" alt="{{ card.name }}" width="100%" height="{{ im.height}}" class="card__image">
         {% endthumbnail %}
     </a>
     <div class="card__body">
-        <a class="card__title link" href="{% url 'profile' user_id=card.author.id %}" target="_blank">{{ card.name }}</a>
+        <a class="card__title link" href="{% url 'profile' user_id=card.author.id %}">{{ card.name }}</a>
         <ul class="card__items">
             {% for tag in card.tags.all %}
-            <li class="card__item"><span class="badge badge_style_{% if tag.slug == 'breakfast' %}orange{% elif tag.slug == 'lunch' %}green{% else %}purple{% endif %}">{{ tag.name }}</span></li>
+            <li class="card__item"><span class="badge badge_style_{{ tag|add_color }}">{{ tag.name }}</span></li>
             {% endfor %}
         </ul>
         <div class="card__items card__items_column">
