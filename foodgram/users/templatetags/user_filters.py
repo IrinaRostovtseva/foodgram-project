@@ -1,7 +1,16 @@
+from urllib.parse import urlencode
+
 from django import template
 
 
 register = template.Library()
+
+
+@register.filter
+def url_with_get(request, page):
+    query = request.GET.copy()
+    query['page'] = page
+    return query.urlencode()
 
 
 @register.filter

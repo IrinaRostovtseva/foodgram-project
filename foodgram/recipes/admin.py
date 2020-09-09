@@ -9,9 +9,14 @@ class IngredientInline(admin.TabularInline):
 
 class RecipeAdmin(admin.ModelAdmin):
     model = Recipe
-    list_display = ('pk', 'author', 'name',)
+    list_display = ('pk', 'author', 'name', 'in_favorite_count',)
     list_filter = ('name', 'author', 'tags')
     inlines = (IngredientInline,)
+
+    def in_favorite_count(self, obj):
+        return obj.favorite_set.count()
+    
+    in_favorite_count.short_description = 'В избранном'
 
 
 class ProductAdmin(admin.ModelAdmin):

@@ -36,6 +36,9 @@ class Recipe(models.Model):
     pub_date = models.DateTimeField(
         auto_now_add=True, verbose_name='Время публикации', db_index=True)
 
+    class Meta:
+        ordering = ('-pub_date',)
+
     def __str__(self):
         return f'{self.name}'
 
