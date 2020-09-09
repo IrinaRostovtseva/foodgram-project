@@ -9,7 +9,7 @@
 {% block content %}
 {% csrf_token %}
 {% load thumbnail user_filters %}
-    <div class="single-card" data-id="{{ recipe.id }}" author-id="{{ recipe.author.id }}">
+    <div class="single-card" data-id="{{ recipe.id }}" data-author="{{ recipe.author.id }}">
         {% thumbnail recipe.image '480x480' crop="center" upscale=True as im %}
         <img src="{{ im.url }}" alt="recipe.name" width="480" height="480" class="single-card__image">
         {% endthumbnail %}
@@ -42,7 +42,9 @@
                 {% endif %}
             </div>
             <ul class="single-card__items">
-                <li class="single-card__item"><button class="button button_style_blue" name="purchpurchases" data-out><span class="icon-plus"></span> Добавить в покупки</button></li>
+                {% if request.user.is_authenticated %}
+                    <li class="single-card__item"><button class="button{% if is_purchased %} button_style_light-blue-outline{% else %} button_style_blue{% endif %}" name="purchpurchases"{% if not is_purchased %} data-out{% endif %}><span class="{% if is_purchased %}icon-check{% else %}icon-plus{% endif %} button__icon"></span>{% if is_purchased %}Рецепт добавлен{% else %}Добавить в покупки{% endif %}</button></li>
+                {% endif %}
                 {% if request.user.is_authenticated and request.user != recipe.author %}
                     <li class="single-card__item" data-id="{{ recipe.author.id }}"><button class="button button_style_light-blue button_size_auto{% if is_subscribed %} button_style_light-blue-outline{% endif %}" name="subscribe"{% if not is_subscribed %} data-out{% endif %}>{% if is_subscribed %}Отписаться от автора{% else %}Подписаться на автора{% endif %}</button></li>
                 {% endif %}

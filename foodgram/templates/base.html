@@ -7,14 +7,14 @@
         <meta http-equiv="X-UA-Compatible" content="ie=edge">
         <title>{% block title %}Title{% endblock %}</title>
         {% load static %}
-        <link rel="stylesheet" href="{% static 'vendor/normalize.css' %}">
         {% block styles %}
         {% endblock %}
     </head>
     <body class="body">
         {% include 'header.html' %}
         <main class="main container">
-            {% block content %}{% endblock %}
+            {% block content %}
+            {% endblock %}
         </main>
         {% include 'footer.html' %}
         <script src="{% static 'js/config/config.js' %}"></script>

@@ -14,7 +14,11 @@
         {% include 'tags.html' %}
     </div>
     {% if request.user.is_authenticated and request.user != profile %}
-        <p style="padding: 0 0 2em 0;"><a class="button button_style_light-blue" href="">Подписаться на автора</a></p>
+    <div class="author-subscribe" data-author="{{ profile.id }}">
+        <p style="padding: 0 0 2em 0;">
+            <button class="button button_style_light-blue button_size_auto" name="subscribe"{% if not is_subscribed %} data-out{% endif %}>{% if is_subscribed %}<span class="icon-check button__icon"></span>Отписаться на автора{% else %}Подписаться на автора{% endif %}</button>
+        </p>
+    </div>    
     {% endif %}
     <div class="card-list">
         {% for card in page %}
@@ -29,9 +33,9 @@
         <script src="{% static 'js/components/Purchpurachases.js' %}"></script>
         <script src="{% static 'js/components/Subscribe.js' %}"></script>
         <script src="{% static 'js/components/Favorites.js' %}"></script>
-        <script src="{% static 'js/components/CardList.js' %}"></script>
+        <script src="{% static 'js/components/AuthorRecipe.js' %}"></script>
         <script src="{% static 'js/components/Header.js' %}"></script>
         <script src="{% static 'js/api/Api.js' %}"></script>
-        <script src="{% static 'js/indexAuth.js' %}"></script>
+        <script src="{% static 'js/authorRecipe.js' %}"></script>
 
 {% endblock %}
