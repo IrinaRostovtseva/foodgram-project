@@ -3,81 +3,99 @@ from urllib.parse import unquote
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator
-from django.db.models import Sum
 from django.http import FileResponse, JsonResponse
-from django.shortcuts import get_object_or_404, render, redirect
-from django.views.generic.edit import FormView
+from django.shortcuts import get_object_or_404, redirect, render
 from users.models import Subscription
 
 from .create_file import write_into_file
 from .forms import RecipeForm
-from .models import Favorite, Purchase, Recipe, User, Product, Ingredient, Tag
+from .models import Favorite, Ingredient, Product, Purchase, Recipe, Tag, User
+
+
+TAGS = Tag.objects.all()
+
+
+def _get_filtered_recipes(request, objs):
+    tags = request.GET.getlist('tag')
+    if tags:
+        return objs.prefetch_related('author', 'tags').filter(
+            tags__slug__in=tags).distinct().order_by('-pub_date')
+    else:
+        return objs.prefetch_related('author', 'tags',).order_by('-pub_date')
+
+
+def _get_counter(request):
+    try:
+        purchase = Purchase.objects.get(user=request.user)
+        shop_count = purchase.recipes.count()
+    except ObjectDoesNotExist:
+        shop_count = 0
+    return shop_count
+
+
+def _get_purchases_list(request):
+    try:
+        purchase = Purchase.objects.get(user=request.user)
+        purchase_list = purchase.recipes.all()
+    except ObjectDoesNotExist:
+        purchase_list = []
+    return purchase_list
 
 
 def index(request):
-    tag = request.GET.get('tag', None)
-    if tag is not None:
-        recipe_list = Recipe.objects.filter(
-            tags__slug=tag).order_by('-pub_date')
-    else:
-        recipe_list = Recipe.objects.order_by('-pub_date')
-    paginator = Paginator(recipe_list, 3)
+    recipe_list = _get_filtered_recipes(request, Recipe.objects)
+    paginator = Paginator(recipe_list, 6)
     page_number = request.GET.get('page')
     page = paginator.get_page(page_number)
     context = {
-        'tag': tag,
+        'all_tags': TAGS,
         'page': page,
         'paginator': paginator
     }
-    if request.user.is_authenticated:
-        if Purchase.objects.filter(user=request.user).exists():
-            purchase = Purchase.objects.get(user=request.user)
-            shop_count = purchase.recipes.count()
-        else:
-            shop_count = 0
-        if Favorite.objects.filter(user=request.user).exists():
-            favorite = Favorite.objects.get(user=request.user)
+    user = request.user
+    if user.is_authenticated:
+        shop_count = _get_counter(request)
+        purchase_list = _get_purchases_list(request)
+        try:
+            favorite = Favorite.objects.get(user=user)
             context['favorites'] = favorite.recipes.all()
-        else:
+        except ObjectDoesNotExist:
             context['favorites'] = []
         context['shop_count'] = shop_count
+        context['purchase_list'] = purchase_list
     return render(request, 'index.html', context)
 
 
 def profile(request, user_id):
     if request.method == 'GET':
-        tag = request.GET.get('tag')
         profile = get_object_or_404(User, id=user_id)
-        if tag is None:
-            recipes_list = Recipe.objects.filter(
-                author__id=user_id).order_by('-pub_date')
-        else:
-            recipes_list = Recipe.objects.filter(
-                author__id=user_id, tags__slug=tag).order_by('-pub_date')
-        paginator = Paginator(recipes_list, 3)
+        recipes_list = _get_filtered_recipes(request, Recipe.objects)
+        paginator = Paginator(recipes_list.filter(author=profile), 6)
         page_number = request.GET.get('page')
         page = paginator.get_page(page_number)
         context = {
+            'all_tags': TAGS,
             'profile': profile,
             'page': page,
             'paginator': paginator
         }
-        # Если юзер авторизован добавляет в контекст счетчик покупок и избранное
+        # Если юзер авторизован, добавляет в контекст счетчик
+        # покупок и избранное
         if request.user.is_authenticated:
-            is_subscribed = Subscription.objects.filter(user__id=user_id, author=profile).exists()
-            if Purchase.objects.filter(user=request.user).exists():
-                purchase = Purchase.objects.get(user=request.user)
-                shop_count = purchase.recipes.count()
-            else:
-                shop_count = 0
-            if Favorite.objects.filter(user=request.user).exists():
+            is_subscribed = Subscription.objects.filter(
+                user=request.user, author=profile).exists()
+            shop_count = _get_counter(request)
+            purchase_list = _get_purchases_list(request)
+            try:
                 favorite = Favorite.objects.get(user=request.user)
                 context['favorites'] = favorite.recipes.all()
-            else:
+            except ObjectDoesNotExist:
                 context['favorites'] = []
             context['is_subscribed'] = is_subscribed
             context['shop_count'] = shop_count
+            context['purchase_list'] = purchase_list
         return render(request, 'profile.html', context)
 
 
@@ -88,110 +106,101 @@ def recipe_detail(request, recipe_id):
         context = {
             'recipe': recipe,
         }
-        if request.user.is_authenticated:
+        user = request.user
+        if user.is_authenticated:
             is_subscribed = Subscription.objects.filter(
-                user=request.user, author=author).exists()
-            if Purchase.objects.filter(user=request.user).exists():
-                purchase = Purchase.objects.get(user=request.user)
-                shop_count = purchase.recipes.count()
-            else:
-                shop_count = 0
-            if Favorite.objects.filter(user=request.user).exists():
-                favorite = Favorite.objects.get(user=request.user)
+                user=user, author=author).exists()
+            shop_count = _get_counter(request)
+            try:
+                favorite = Favorite.objects.get(user=user)
                 is_favorite = favorite.recipes.filter(id=recipe_id).exists()
-            else:
+            except ObjectDoesNotExist:
                 is_favorite = False
+            try:
+                purchase = Purchase.objects.get(user=user)
+                is_purchased = purchase.recipes.filter(id=recipe_id).exists()
+            except ObjectDoesNotExist:
+                is_purchased = False
             context['is_subscribed'] = is_subscribed
             context['is_favorite'] = is_favorite
             context['shop_count'] = shop_count
+            context['is_purchased'] = is_purchased
         return render(request, 'recipe_detail.html', context)
 
 
-@login_required
+@login_required(login_url='auth/login/')
 def favorite(request):
     # GET-запрос на страницу с избранными рецептами
     if request.method == 'GET':
-        tag = request.GET.get('tag')
         auth_user = get_object_or_404(User, username=request.user.username)
-        if Favorite.objects.filter(user=auth_user).exists():
+        try:
             favorite = Favorite.objects.get(user=auth_user)
-            if tag is None:
-                recipes_list = favorite.recipes.all().order_by('pub_date')
-            else:
-                recipes_list = favorite.recipes.filter(
-                    tags__slug=tag).order_by('pub_date')
-        else:
+            recipes_list = _get_filtered_recipes(request, favorite.recipes)
+        except ObjectDoesNotExist:
             recipes_list = []
-        if Purchase.objects.filter(user=request.user).exists():
-            purchase = Purchase.objects.get(user=request.user)
-            shop_count = purchase.recipes.count()
-        else:
-            shop_count = 0
-        paginator = Paginator(recipes_list, 3)
+        shop_count = _get_counter(request)
+        purchase_list = _get_purchases_list(request)
+        paginator = Paginator(recipes_list, 6)
         page_number = request.GET.get('page')
         page = paginator.get_page(page_number)
         context = {
-            'tag': tag,
+            'all_tag': TAGS,
+            'favorites': page,
             'shop_count': shop_count,
+            'purchase_list': purchase_list,
             'paginator': paginator,
             'page': page
         }
         return render(request, 'favorites.html', context)
-    # POST-запрос на добавление в избранное 
+    # POST-запрос на добавление в избранное
     elif request.method == 'POST':
         json_data = json.loads(request.body.decode())
         recipe_id = int(json_data['id'])
         recipe = get_object_or_404(Recipe, id=recipe_id)
         user = get_object_or_404(User, id=request.user.id)
-        is_exist = Favorite.objects.filter(user=user).exists()
         data = {'success': 'true'}
-        if not is_exist:
+        try:
+            favorite = Favorite.objects.get(user=user)
+        except ObjectDoesNotExist:
             favorite = Favorite(user=user)
             favorite.save()
             favorite.recipes.add(recipe)
+        is_favorite = favorite.recipes.filter(id=recipe_id).exists()
+        if is_favorite:
+            data['success'] = 'false'
         else:
-            favorite = Favorite.objects.get(user=user)
-            is_favorite = favorite.recipes.filter(id=recipe_id).exists()
-            if is_favorite:
-                data['success'] = 'false'
-            else:
-                favorite.recipes.add(recipe)
+            favorite.recipes.add(recipe)
         return JsonResponse(data)
 
 
-@login_required
+@login_required(login_url='auth/login/')
 def delete_favorite(request, recipe_id):
     if request.method == 'DELETE':
         user = get_object_or_404(User, username=request.user.username)
         recipe = get_object_or_404(Recipe, id=recipe_id)
-        is_exist = Favorite.objects.filter(user=user).exists()
         data = {'success': 'true'}
-        if not is_exist:
-            data['success'] = 'false'
-        else:
+        try:
             favorite = Favorite.objects.get(user=user)
-            if favorite.recipes.filter(id=recipe_id).exists():
-                data['success'] = 'false'
-            else:
-                favorite.recipes.remove(recipe)
+        except ObjectDoesNotExist:
+            data['success'] = 'false'
+        try:
+            favorite.recipes.remove(recipe)
+        except ObjectDoesNotExist:
+            data['success'] = 'false'
         return JsonResponse(data)
 
 
-@login_required
+@login_required(login_url='auth/login/')
 def get_subscriptions(request):
     if request.method == 'GET':
         auth_user = get_object_or_404(User, username=request.user.username)
-        if Subscription.objects.filter(user=auth_user).exists():
+        try:
             subscriptions = Subscription.objects.filter(user=auth_user)
-        else:
+        except ObjectDoesNotExist:
             subscriptions = []
-        if Purchase.objects.filter(user=request.user).exists():
-            purchase = Purchase.objects.get(user=request.user)
-            shop_count = purchase.recipes.count()
-        else:
-            shop_count = 0
+        shop_count = _get_counter(request)
         page_num = request.GET.get('page')
-        paginator = Paginator(subscriptions, 3)
+        paginator = Paginator(subscriptions, 6)
         page = paginator.get_page(page_num)
         context = {
             'shop_count': shop_count,
@@ -201,7 +210,7 @@ def get_subscriptions(request):
         return render(request, 'subscriptions.html', context)
 
 
-@login_required
+@login_required(login_url='auth/login/')
 def subscription(request):
     if request.method == 'POST':
         json_data = json.loads(request.body.decode())
@@ -218,39 +227,37 @@ def subscription(request):
         return JsonResponse(data)
 
 
-@login_required
+@login_required(login_url='auth/login/')
 def delete_subscription(request, author_id):
     if request.method == 'DELETE':
         auth_user = get_object_or_404(User, id=request.user.id)
         author = get_object_or_404(User, id=author_id)
-        is_exist = Subscription.objects.filter(
-            user=auth_user, author=author).exists()
         data = {'success': 'true'}
-        if not is_exist:
-            data['success'] = 'false'
-        else:
+        try:
             follow = Subscription.objects.filter(
                 user=auth_user, author=author)
             follow.delete()
+        except ObjectDoesNotExist:
+            data['success'] = 'false'
         return JsonResponse(data)
 
 
-@login_required
+@login_required(login_url='auth/login/')
 def purchase(request):
     # GET-запрос на страницу со списком покупок
     if request.method == 'GET':
         user = get_object_or_404(User, id=request.user.id)
-        is_list_exist = Purchase.objects.filter(user=user).exists()
-        context = {}
-        if is_list_exist:
+        try:
             purchase = Purchase.objects.get(user=user)
             recipes_list = purchase.recipes.all()
             shop_count = purchase.recipes.count()
-        else:
+        except ObjectDoesNotExist:
             recipes_list = []
             shop_count = 0
-        context['recipes_list'] = recipes_list
-        context['shop_count'] = shop_count
+        context = {
+            'recipes_list': recipes_list,
+            'shop_count': shop_count,
+        }
         return render(request, 'purchases.html', context)
     # POST-запрос на добавление рецепта в список покупок
     if request.method == 'POST':
@@ -258,75 +265,78 @@ def purchase(request):
         recipe_id = int(json_data['id'])
         user = get_object_or_404(User, id=request.user.id)
         recipe = get_object_or_404(Recipe, id=recipe_id)
-        is_exist = Purchase.objects.filter(user=user).exists()
         data = {
             'success': 'true'
         }
-        if is_exist:
+        try:
             purchase = Purchase.objects.get(user=user)
-            if purchase.recipes.filter(id=recipe_id).exists():
-                data['success'] = 'false'
-            else:
-                purchase.recipes.add(recipe)
-        else:
+        except ObjectDoesNotExist:
             purchase = Purchase(user=user)
             purchase.save()
+        if purchase.recipes.filter(id=recipe_id).exists():
+            data['success'] = 'false'
+        else:
             purchase.recipes.add(recipe)
         return JsonResponse(data)
 
 
-@login_required
+@login_required(login_url='auth/login/')
 def delete_purchase(request, recipe_id):
     if request.method == 'DELETE':
         recipe = get_object_or_404(Recipe, id=recipe_id)
-        is_exist = Purchase.objects.filter(user=request.user).exists()
         data = {
             'success': 'true'
         }
-        if not is_exist:
-            data['success'] = 'false'
-        else:
+        try:
             purchase = Purchase.objects.get(user=request.user)
-            is_recipe_exist = purchase.recipes.filter(id=recipe_id).exists()
-            if is_recipe_exist:
-                purchase.recipes.remove(recipe)
-            else:
-                data['success'] = 'false'
+        except ObjectDoesNotExist:
+            data['success'] = 'false'
+        try:
+            purchase.recipes.remove(recipe)
+        except ObjectDoesNotExist:
+            data['success'] = 'false'
         return JsonResponse(data)
 
 
-@login_required
+@login_required(login_url='auth/login/')
 def send_shop_list(request):
     if request.method == 'GET':
-        user = get_object_or_404(User, id=request.user.id)
-        purchase = Purchase.objects.get(user=user)
+        purchase = Purchase.objects.get(user=request.user)
         recipes_list = purchase.recipes.all()
         ingredients = recipes_list.values(
-            'ingredients__title', 'ingredients__unit').annotate(Sum('ingredient__amount'))
-        filename = f'{settings.MEDIA_ROOT}/shoplists/{purchase.id}_shoplist.txt'
+            'ingredients__title',
+            'ingredients__unit',
+            'ingredient__amount'
+        )
+        filename = f'{settings.MEDIA_ROOT}/shoplists/{purchase.id}_list.txt'
         write_into_file(filename, ingredients)
         shop_file = open(filename, 'rb')
         return FileResponse(shop_file, as_attachment=True)
 
 
-@login_required
+@login_required(login_url='auth/login/')
 def new_recipe(request):
+    shop_count = _get_counter(request)
+    # GET-запрос на страницу создания рецепта
     if request.method == 'GET':
         form = RecipeForm()
         context = {
             'page_title': 'Создание рецепта',
             'button_label': 'Создать рецепт',
+            'shop_count': shop_count,
             'form': form
         }
         return render(request, 'recipe_form.html', context)
+    # POST-запрос с данными из формы создания рецепта
     elif request.method == 'POST':
         form = RecipeForm(request.POST, files=request.FILES or None)
         if form.is_valid():
             recipe = form.save(commit=False)
             recipe.author = request.user
             form.save()
-            products = [Product.objects.get(
-                title=title) for title in request.POST.getlist('nameIngredient')]
+            ingedient_names = request.POST.getlist('nameIngredient')
+            products = [Product.objects
+                        .get(title=title) for title in ingedient_names]
             amounts = request.POST.getlist('valueIngredient')
             item = Recipe.objects.get(name=form.cleaned_data['name'])
             for i in range(len(amounts)):
@@ -337,12 +347,13 @@ def new_recipe(request):
         context = {
             'page_title': 'Создание рецепта',
             'button_label': 'Создать рецепт',
+            'shop_count': shop_count,
             'form': form
         }
         return render(request, 'recipe_form.html', context)
 
 
-@login_required
+@login_required(login_url='auth/login/')
 def get_ingredients(request):
     if request.method == 'GET':
         query = unquote(request.GET.get('query'))
@@ -352,39 +363,57 @@ def get_ingredients(request):
         return JsonResponse(data, safe=False)
 
 
-@login_required
+@login_required(login_url='auth/login/')
 def edit_recipe(request, recipe_id):
+    shop_count = _get_counter(request)
+    # GET-запрос на страницу редактирования рецепта
     recipe = get_object_or_404(Recipe, id=recipe_id)
-    ingredients = recipe.ingredient_set.all()
     if request.method == 'GET':
+        ingredients = recipe.ingredient_set.select_related('ingredient').all()
         form = RecipeForm(instance=recipe)
         context = {
             'recipe_id': recipe_id,
             'page_title': 'Редактирование рецепта',
             'button_label': 'Сохранить',
+            'shop_count': shop_count,
             'ingredients': ingredients,
             'form': form
         }
         return render(request, 'recipe_form.html', context)
+    # POST-запрос с данными из формы редактирования рецепта
     elif request.method == 'POST':
-        form = RecipeForm(request.POST or None, files=request.FILES or None, instance=recipe)
+        form = RecipeForm(request.POST or None,
+                          files=request.FILES or None, instance=recipe)
         if form.is_valid():
             form.save()
-            ing_set = set(ingredients)
-            new_ing = {Product.objects.get(
-                title=name) for name in request.POST.getlist('nameIngredient')}
-            ing_to_add = list(new_ing.difference(ing_set))
-            ing_to_delete = list(ing_set.difference(new_ing))
+            old_ingredients = recipe.ingredients.all()
+            new_products = request.POST.getlist('nameIngredient')
+            new_units = request.POST.getlist('unitsIngredient')
             amounts = request.POST.getlist('valueIngredient')
+            products_num = len(new_products)
+            new_ingredients = [Product.objects.get(
+                title=new_products[i],
+                unit=new_units[i]) for i in range(products_num)]
+            recipe.ingredients.remove(*old_ingredients)
             for i in range(len(amounts)):
                 ingredient = Ingredient(
-                    recipe=recipe, ingredient=ing_to_add[i], amount=amounts[i])
+                    recipe=recipe,
+                    ingredient=new_ingredients[i],
+                    amount=amounts[i])
                 ingredient.save()
-            recipe.ingredients.remove(*ing_to_delete)
             return redirect('index')
+        context = {
+            'recipe_id': recipe_id,
+            'page_title': 'Редактирование рецепта',
+            'button_label': 'Сохранить',
+            'shop_count': shop_count,
+            'ingredients': ingredients,
+            'form': form
+        }
+        return render(request, 'recipe_form.html', context)
 
 
-@login_required
+@login_required(login_url='auth/login/')
 def delete_recipe(request, recipe_id):
     if request.method == 'GET':
         recipe = get_object_or_404(Recipe, id=recipe_id)
