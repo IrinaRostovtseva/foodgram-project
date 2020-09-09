@@ -15,6 +15,7 @@ def write_ingredients(apps, schema_editor):
             product = Ingredient(title=row[0], unit=row[1])
             product.save()
 
+
 class Migration(migrations.Migration):
 
     dependencies = [

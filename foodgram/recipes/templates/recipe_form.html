@@ -47,13 +47,13 @@
                         <label for="cantidad" class="form__label" id="cantidadVal">шт.</label>
                     </div>
                     <span class="form__ingredient-link" id="addIng">Добавить ингредиент</span>
-                    {% if ingredients %}
+                    <!-- {% if ingredients %}
                         {% for item in ingredients %}
                             <div class="form__field-item-ingredient" id="Ing{{ forloop.counter }}">
                                 {% include 'ingredients_list_form.html' with data=item cur=forloop.counter %}
                             </div>
                         {% endfor %}
-                    {% endif %}
+                    {% endif %} -->
                     <span class="form__error"></span>
                 </div>
             </div>
