@@ -10,10 +10,11 @@ def write_ingredients(apps, schema_editor):
     ingredients = os.path.join(settings.BASE_DIR, 'ingredients.csv')
     with open(ingredients, 'r') as ing:
         f = csv.reader(ing, delimiter=',')
-        Ingredient = apps.get_model('recipes.Product')
+        Product = apps.get_model('recipes.Product')
+        products = []
         for row in f:
-            product = Ingredient(title=row[0], unit=row[1])
-            product.save()
+            products.append(Product(title=row[0], unit=row[1]))
+        Product.objects.bulk_create(products)
 
 
 class Migration(migrations.Migration):
