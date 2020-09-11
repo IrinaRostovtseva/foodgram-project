@@ -32,11 +32,9 @@ def index(request):
     }
     user = request.user
     if user.is_authenticated:
-        purchase_list = Purchase.purchase.get_purchases_list(user)
-        favorites = Favorite.favorite.get_favorites(user)
         context['active'] = 'recipe'
-        context['purchase_list'] = purchase_list
-        context['favorites'] = favorites
+        context['purchase_list'] = Purchase.purchase.get_purchases_list(user)
+        context['favorites'] = Favorite.favorite.get_favorites(user)
     return render(request, 'index.html', context)
 
 
@@ -55,17 +53,14 @@ def profile(request, user_id):
         'page': page,
         'paginator': paginator
     }
-    # Если юзер авторизован, добавляет в контекст счетчик
+    # Если юзер авторизован, добавляет в контекст список
     # покупок и избранное
     user = request.user
     if user.is_authenticated:
-        is_subscribed = Subscription.objects.filter(
+        context['is_subscribed'] = Subscription.objects.filter(
             user=request.user, author=profile).exists()
-        purchase_list = Purchase.purchase.get_purchases_list(user)
-        favorites = Favorite.favorite.get_favorites(user)
-        context['is_subscribed'] = is_subscribed
-        context['purchase_list'] = purchase_list
-        context['favorites'] = favorites
+        context['purchase_list'] = Purchase.purchase.get_purchases_list(user)
+        context['favorites'] = Favorite.favorite.get_favorites(user)
     return render(request, 'profile.html', context)
 
 
@@ -246,33 +241,35 @@ class PurchaseView(View):
 
 @login_required(login_url='auth/login/')
 def delete_purchase(request, recipe_id):
-    if request.method == 'DELETE':
-        recipe = get_object_or_404(Recipe, id=recipe_id)
-        data = {
-            'success': 'true'
-        }
-        try:
-            purchase = Purchase.objects.get(user=request.user)
-            purchase.recipes.remove(recipe)
-        except ObjectDoesNotExist:
-            data['success'] = 'false'
-        return JsonResponse(data)
+    if request.method != 'DELETE':
+        return HttpResponse(status_code=403)
+    recipe = get_object_or_404(Recipe, id=recipe_id)
+    data = {
+        'success': 'true'
+    }
+    try:
+        purchase = Purchase.objects.get(user=request.user)
+        purchase.recipes.remove(recipe)
+    except ObjectDoesNotExist:
+        data['success'] = 'false'
+    return JsonResponse(data)
 
 
 @login_required(login_url='auth/login/')
 def send_shop_list(request):
-    if request.method == 'GET':
-        user = request.user
-        ingredients = (Ingredient.objects
-                       .select_related('ingredient')
-                       .filter(recipe__purchase__user=user)
-                       .values('ingredient__title', 'ingredient__unit')
-                       .annotate(Sum('amount'))
-                       )
-        filename = f'{settings.MEDIA_ROOT}/shoplists/{user.id}_list.txt'
-        write_into_file(filename, ingredients)
-        shop_file = open(filename, 'rb')
-        return FileResponse(shop_file, as_attachment=True)
+    if request.method != 'GET':
+        return HttpResponse(status_code=403)
+    user = request.user
+    ingredients = (Ingredient.objects
+                   .select_related('ingredient')
+                   .filter(recipe__purchase__user=user)
+                   .values('ingredient__title', 'ingredient__unit')
+                   .annotate(Sum('amount'))
+                   )
+    filename = f'{settings.MEDIA_ROOT}/shoplists/{user.id}_list.txt'
+    write_into_file(filename, ingredients)
+    shop_file = open(filename, 'rb')
+    return FileResponse(shop_file, as_attachment=True)
 
 
 @login_required(login_url='auth/login/')
@@ -297,14 +294,17 @@ def new_recipe(request):
         recipe.author = request.user
         form.save()
         ingedient_names = request.POST.getlist('nameIngredient')
-        products = [Product.objects
-                    .get(title=title) for title in ingedient_names]
+        ingredient_units = request.POST.getlist('unitsIngredient')
         amounts = request.POST.getlist('valueIngredient')
-        item = Recipe.objects.get(name=form.cleaned_data['name'])
+        products = [Product.objects.get(
+            title=ingedient_names[i],
+            unit=ingredient_units[i]
+        ) for i in range(len(ingedient_names))]
+        ingredients = []
         for i in range(len(amounts)):
-            ingredient = Ingredient(
-                recipe=item, ingredient=products[i], amount=amounts[i])
-            ingredient.save()
+            ingredients.append(Ingredient(
+                recipe=recipe, ingredient=products[i], amount=amounts[i]))
+        Ingredient.objects.bulk_create(ingredients)
         return redirect('index')
 
 
@@ -329,9 +329,7 @@ def edit_recipe(request, recipe_id):
     }
     # GET-запрос на страницу редактирования рецепта
     if request.method == 'GET':
-        ingredients = recipe.ingredient_set.select_related('ingredient').all()
         form = RecipeForm(instance=recipe)
-        context['ingredients'] = ingredients
         context['form'] = form
         return render(request, 'recipe_form.html', context)
     # POST-запрос с данными из формы редактирования рецепта
@@ -339,7 +337,6 @@ def edit_recipe(request, recipe_id):
         form = RecipeForm(request.POST or None,
                           files=request.FILES or None, instance=recipe)
         if not form.is_valid():
-            context['ingredients'] = ingredients
             context['form'] = form
             return render(request, 'recipe_form.html', context)
         form.save()
@@ -361,10 +358,11 @@ def edit_recipe(request, recipe_id):
 
 @login_required(login_url='auth/login/')
 def delete_recipe(request, recipe_id):
-    if request.method == 'GET':
-        recipe = get_object_or_404(Recipe, id=recipe_id)
-        recipe.delete()
-        return redirect('index')
+    if request.method != 'GET':
+        return HttpResponse(status_code=403)
+    recipe = get_object_or_404(Recipe, id=recipe_id)
+    recipe.delete()
+    return redirect('index')
 
 
 def page_not_found(request, exception):
