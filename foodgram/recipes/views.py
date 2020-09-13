@@ -3,6 +3,8 @@ from urllib.parse import unquote
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import (require_GET, require_http_methods,
+                                            require_POST)
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator
 from django.db.models import Sum
@@ -17,11 +19,10 @@ from .forms import RecipeForm
 from .models import Favorite, Ingredient, Product, Purchase, Recipe, Tag, User
 
 
+@require_GET
 def index(request):
-    if request.method != 'GET':
-        return HttpResponse(status_code=403)
     tags = request.GET.getlist('tag')
-    recipe_list = Recipe.filtration.tag_filter(tags)
+    recipe_list = Recipe.recipes.tag_filter(tags)
     paginator = Paginator(recipe_list, 6)
     page_number = request.GET.get('page')
     page = paginator.get_page(page_number)
@@ -38,12 +39,11 @@ def index(request):
     return render(request, 'index.html', context)
 
 
+@require_GET
 def profile(request, user_id):
-    if request.method != 'GET':
-        return HttpResponse(status_code=403)
     profile = get_object_or_404(User, id=user_id)
     tags = request.GET.getlist('tag')
-    recipes_list = Recipe.filtration.tag_filter(tags)
+    recipes_list = Recipe.recipes.tag_filter(tags)
     paginator = Paginator(recipes_list.filter(author=profile), 6)
     page_number = request.GET.get('page')
     page = paginator.get_page(page_number)
@@ -64,9 +64,8 @@ def profile(request, user_id):
     return render(request, 'profile.html', context)
 
 
+@require_GET
 def recipe_detail(request, recipe_id):
-    if request.method != 'GET':
-        return HttpResponse(status_code=403)
     recipe = get_object_or_404(Recipe, id=recipe_id)
     author = recipe.author
     context = {
@@ -77,12 +76,12 @@ def recipe_detail(request, recipe_id):
         is_subscribed = Subscription.objects.filter(
             user=user, author=author).exists()
         try:
-            is_favorite = Favorite.objects.get(
+            is_favorite = Favorite.favorite.get(
                 user=user).recipes.filter(id=recipe_id).exists()
         except ObjectDoesNotExist:
             is_favorite = False
         try:
-            is_purchased = Purchase.objects.get(
+            is_purchased = Purchase.purchase.get(
                 user=user).recipes.filter(id=recipe_id).exists()
         except ObjectDoesNotExist:
             is_purchased = False
@@ -135,24 +134,24 @@ class FavoriteView(View):
 
 
 @login_required(login_url='auth/login/')
+@require_http_methods('DELETE')
 def delete_favorite(request, recipe_id):
-    if request.method != 'DELETE':
-        return HttpResponse(status_code=403)
     user = get_object_or_404(User, username=request.user.username)
     recipe = get_object_or_404(Recipe, id=recipe_id)
     data = {'success': 'true'}
     try:
-        favorite = Favorite.objects.get(user=user)
-        favorite.recipes.remove(recipe)
+        favorite = Favorite.favorite.get(user=user)
     except ObjectDoesNotExist:
         data['success'] = 'false'
+    if not favorite.recipes.filter(id=recipe_id).exists():
+        data['success'] = 'false'
+    favorite.recipes.remove(recipe)
     return JsonResponse(data)
 
 
 @login_required(login_url='auth/login/')
+@require_GET
 def get_subscriptions(request):
-    if request.method != 'GET':
-        return HttpResponse(status_code=403)
     auth_user = get_object_or_404(User, username=request.user.username)
     try:
         subscriptions = Subscription.objects.filter(user=auth_user)
@@ -170,9 +169,8 @@ def get_subscriptions(request):
 
 
 @login_required(login_url='auth/login/')
+@require_POST
 def subscription(request):
-    if request.method != 'POST':
-        return HttpResponse(status_code=403)
     json_data = json.loads(request.body.decode())
     auth_user = get_object_or_404(User, username=request.user.username)
     author_id = int(json_data['id'])
@@ -188,18 +186,19 @@ def subscription(request):
 
 
 @login_required(login_url='auth/login/')
+@require_http_methods('DELETE')
 def delete_subscription(request, author_id):
-    if request.method != 'DELETE':
-        return HttpResponse(status_code=403)
     auth_user = get_object_or_404(User, id=request.user.id)
     author = get_object_or_404(User, id=author_id)
     data = {'success': 'true'}
     try:
         follow = Subscription.objects.filter(
             user=auth_user, author=author)
-        follow.delete()
     except ObjectDoesNotExist:
         data['success'] = 'false'
+    if not follow:
+        data['success'] = 'false'
+    follow.delete()
     return JsonResponse(data)
 
 
@@ -240,25 +239,25 @@ class PurchaseView(View):
 
 
 @login_required(login_url='auth/login/')
+@require_http_methods('DELETE')
 def delete_purchase(request, recipe_id):
-    if request.method != 'DELETE':
-        return HttpResponse(status_code=403)
     recipe = get_object_or_404(Recipe, id=recipe_id)
     data = {
         'success': 'true'
     }
     try:
-        purchase = Purchase.objects.get(user=request.user)
-        purchase.recipes.remove(recipe)
+        purchase = Purchase.purchase.get(user=request.user)
     except ObjectDoesNotExist:
         data['success'] = 'false'
+    if not purchase.recipes.filter(id=recipe_id).exists():
+        data['success'] = 'false'
+    purchase.recipes.remove(recipe)
     return JsonResponse(data)
 
 
 @login_required(login_url='auth/login/')
+@require_GET
 def send_shop_list(request):
-    if request.method != 'GET':
-        return HttpResponse(status_code=403)
     user = request.user
     ingredients = (Ingredient.objects
                    .select_related('ingredient')
@@ -273,6 +272,7 @@ def send_shop_list(request):
 
 
 @login_required(login_url='auth/login/')
+@require_http_methods(['GET', 'POST'])
 def new_recipe(request):
     context = {
         'active': 'new_recipe',
@@ -309,9 +309,8 @@ def new_recipe(request):
 
 
 @login_required(login_url='auth/login/')
+@require_GET
 def get_ingredients(request):
-    if request.method != 'GET':
-        return HttpResponse(status_code=403)
     query = unquote(request.GET.get('query'))
     ingredients = Product.objects.filter(title__startswith=query)
     data = [{'title': ingredient.title, 'dimension': ingredient.unit}
@@ -320,6 +319,7 @@ def get_ingredients(request):
 
 
 @login_required(login_url='auth/login/')
+@require_http_methods(['GET', 'POST'])
 def edit_recipe(request, recipe_id):
     recipe = get_object_or_404(Recipe, id=recipe_id)
     context = {
@@ -357,9 +357,8 @@ def edit_recipe(request, recipe_id):
 
 
 @login_required(login_url='auth/login/')
+@require_GET
 def delete_recipe(request, recipe_id):
-    if request.method != 'GET':
-        return HttpResponse(status_code=403)
     recipe = get_object_or_404(Recipe, id=recipe_id)
     recipe.delete()
     return redirect('index')
