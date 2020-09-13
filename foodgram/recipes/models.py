@@ -25,14 +25,13 @@ class Tag(models.Model):
 class RecipeManager(models.Manager):
     def tag_filter(self, tags):
         if tags:
-            return (super().get_queryset()
-                    .prefetch_related('author', 'tags')
-                    .filter(tags__slug__in=tags)
-                    .distinct())
+            return (super().get_queryset(
+            ).prefetch_related('author', 'tags'
+            ).filter(tags__slug__in=tags
+            ).distinct())
         else:
-            return (super().get_queryset()
-                    .prefetch_related('author', 'tags',)
-                    .all())
+            return (super().get_queryset(
+            ).prefetch_related('author', 'tags',).all())
 
 
 class Recipe(models.Model):
@@ -50,8 +49,7 @@ class Recipe(models.Model):
     pub_date = models.DateTimeField(
         auto_now_add=True, verbose_name='Время публикации', db_index=True)
 
-    objects = models.Manager()
-    filtration = RecipeManager()
+    recipes = RecipeManager()
 
     class Meta:
         ordering = ('-pub_date',)
@@ -98,7 +96,6 @@ class Purchase(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     recipes = models.ManyToManyField(Recipe)
 
-    objects = models.Manager()
     purchase = PurchaseManager()
 
 
@@ -122,5 +119,4 @@ class Favorite(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     recipes = models.ManyToManyField(Recipe)
 
-    objects = models.Manager()
     favorite = FavoriteManager()
