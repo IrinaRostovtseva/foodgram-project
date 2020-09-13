@@ -113,12 +113,11 @@ class FavoriteView(View):
         return render(request, 'favorites.html', context)
 
     def post(self, request):
-        user = get_object_or_404(User, id=request.user.id)
         json_data = json.loads(request.body.decode())
-        recipe_id = int(json_data['id'])
+        recipe_id = json_data['id']
         recipe = get_object_or_404(Recipe, id=recipe_id)
         data = {'success': 'true'}
-        favorite = Favorite.favorite.get_user(user)
+        favorite = Favorite.favorite.get_user(request.user)
         is_favorite = favorite.recipes.filter(id=recipe_id).exists()
         if is_favorite:
             data['success'] = 'false'
@@ -130,11 +129,10 @@ class FavoriteView(View):
 @login_required(login_url='auth/login/')
 @require_http_methods('DELETE')
 def delete_favorite(request, recipe_id):
-    user = get_object_or_404(User, username=request.user.username)
     recipe = get_object_or_404(Recipe, id=recipe_id)
     data = {'success': 'true'}
     try:
-        favorite = Favorite.favorite.get(user=user)
+        favorite = Favorite.favorite.get(user=request.user)
     except ObjectDoesNotExist:
         data['success'] = 'false'
     if not favorite.recipes.filter(id=recipe_id).exists():
@@ -146,10 +144,9 @@ def delete_favorite(request, recipe_id):
 @login_required(login_url='auth/login/')
 @require_GET
 def get_subscriptions(request):
-    auth_user = get_object_or_404(User, username=request.user.username)
     try:
         subscriptions = Subscription.objects.filter(
-            user=auth_user
+            user=request.user
         ).order_by('pk')
     except ObjectDoesNotExist:
         subscriptions = []
@@ -200,8 +197,7 @@ class PurchaseView(View):
         return super().dispatch(*args, **kwargs)
 
     def get_queryset(self):
-        user = get_object_or_404(User, id=self.request.user.id)
-        queryset = self.model.purchase.get_purchases_list(user)
+        queryset = self.model.purchase.get_purchases_list(self.request.user)
         return queryset
 
     def get(self, request):
