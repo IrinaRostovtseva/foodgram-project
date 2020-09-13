@@ -21,3 +21,8 @@ jobs:
 
     - name: Lint with flake8
       run: flake8 foodgram --exclude=foodgram/recipes/migrations/,foodgram/users/migrations/
+
+    - name: Run tests
+      run: |
+        cd foodgram
+        ./manage.py test
