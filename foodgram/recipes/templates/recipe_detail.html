@@ -18,7 +18,7 @@
                 <h1 class="single-card__title">{{ recipe.name }}</h1>
                 {% if request.user.is_authenticated %}
                     <div class="single-card__favorite">
-                        <button class="button button_style_none" name="favorites"{% if not is_favorite %} data-out{% endif %}><span class="icon-favorite icon-favorite_big{% if is_favorite %} icon-favorite_active{% endif %}"></span></button>
+                        <button class="button button_style_none" name="favorites"{% if recipe not in favorites %} data-out{% endif %}><span class="icon-favorite icon-favorite_big{% if recipe in favorites %} icon-favorite_active{% endif %}"></span></button>
                         <div class="single-card__favorite-tooltip tooltip">Добавить в избранное</div>
                     </div>
                 {% endif %}
@@ -43,7 +43,7 @@
             </div>
             <ul class="single-card__items">
                 {% if request.user.is_authenticated %}
-                    <li class="single-card__item"><button class="button{% if is_purchased %} button_style_light-blue-outline{% else %} button_style_blue{% endif %}" name="purchpurchases"{% if not is_purchased %} data-out{% endif %}><span class="{% if is_purchased %}icon-check{% else %}icon-plus{% endif %} button__icon"></span>{% if is_purchased %}Рецепт добавлен{% else %}Добавить в покупки{% endif %}</button></li>
+                    <li class="single-card__item"><button class="button{% if is_purchased %} button_style_light-blue-outline{% else %} button_style_blue{% endif %}" name="purchpurchases"{% if recipe not in purchase_list %} data-out{% endif %}><span class="{% if recipe in purchase_list %}icon-check{% else %}icon-plus{% endif %} button__icon"></span>{% if recipe in purchase_list %}Рецепт добавлен{% else %}Добавить в покупки{% endif %}</button></li>
                 {% endif %}
                 {% if request.user.is_authenticated and request.user != recipe.author %}
                     <li class="single-card__item" data-id="{{ recipe.author.id }}"><button class="button button_style_light-blue button_size_auto{% if is_subscribed %} button_style_light-blue-outline{% endif %}" name="subscribe"{% if not is_subscribed %} data-out{% endif %}>{% if is_subscribed %}Отписаться от автора{% else %}Подписаться на автора{% endif %}</button></li>

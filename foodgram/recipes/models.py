@@ -25,13 +25,15 @@ class Tag(models.Model):
 class RecipeManager(models.Manager):
     def tag_filter(self, tags):
         if tags:
-            return (super().get_queryset(
-            ).prefetch_related('author', 'tags'
-            ).filter(tags__slug__in=tags
+            return (super().get_queryset().prefetch_related(
+                'author', 'tags'
+            ).filter(
+                tags__slug__in=tags
             ).distinct())
         else:
-            return (super().get_queryset(
-            ).prefetch_related('author', 'tags',).all())
+            return (super().get_queryset().prefetch_related(
+                'author', 'tags'
+            ).all())
 
 
 class Recipe(models.Model):
