@@ -14,7 +14,7 @@
     </div>
     <div class="card-list">
         {% for card in page %}
-            {% include 'recipe_card.html' with card=card %}
+            {% include 'recipe_card.html' with card=card favorites=page %}
         {% endfor %}
     </div>
     {% include 'paginator.html' with page=page paginator=paginator %}

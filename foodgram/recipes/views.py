@@ -75,13 +75,12 @@ def profile(request, user_id):
 @require_GET
 def recipe_detail(request, recipe_id):
     recipe = get_object_or_404(Recipe, id=recipe_id)
-    author = recipe.author
     context = {
         'recipe': recipe,
     }
     user = request.user
     if user.is_authenticated:
-        _add_subscription_status(context, user, author)
+        _add_subscription_status(context, user, recipe.author)
         _extend_context(context, user)
     return render(request, 'recipe_detail.html', context)
 
@@ -94,8 +93,9 @@ class FavoriteView(View):
         return super().dispatch(*args, **kwargs)
 
     def get_queryset(self):
-        user = get_object_or_404(User, id=self.request.user.id)
-        queryset = self.model.favorite.get_favorites(user)
+        tags = self.request.GET.getlist('tag')
+        user = self.request.user
+        queryset = self.model.favorite.get_tag_filtered(user, tags)
         return queryset
 
     def get(self, request):
@@ -104,8 +104,7 @@ class FavoriteView(View):
         page = paginator.get_page(page_number)
         purchase_list = Purchase.purchase.get_purchases_list(request.user)
         context = {
-            'all_tag': Tag.objects.all(),
-            'favorites': page,
+            'all_tags': Tag.objects.all(),
             'purchase_list': purchase_list,
             'active': 'favorite',
             'paginator': paginator,

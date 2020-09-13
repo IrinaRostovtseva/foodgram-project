@@ -94,17 +94,13 @@ class TestTagFilter(TestCase):
                 _create_recipe(self.user, f'recipe {i}', tag2)
             else:
                 _create_recipe(self.user, f'recipe {i}', tag1)
-        favorite = Favorite(user=self.user)
-        favorite.save()
-        for i in range(1, 3):
-            favorite.recipes.add(Recipe.recipes.get(id=i))
 
     def test_filter(self):
         urls = [
-            f'{reverse("index")}/?tag=lunch',
-            f'{reverse("index")}/?tag=lunch&page=2',
-            f'{reverse("profile", args=[self.user.id])}/?tag=lunch',
-            f'{reverse("profile", args=[self.user.id])}/?tag=lunch&page=2',
+            f'{reverse("index")}?tag=lunch',
+            f'{reverse("index")}?tag=lunch&page=2',
+            f'{reverse("profile", args=[self.user.id])}?tag=lunch',
+            f'{reverse("profile", args=[self.user.id])}?tag=lunch&page=2',
         ]
         tag = 'card__item"><span class="badge badge_style_orange">завтрак'
         for i in range(len(urls)):
@@ -114,10 +110,15 @@ class TestTagFilter(TestCase):
                 msg=('Фильтры по тегам должны работать правильно на'
                      f'{resp.request["PATH_INFO"]}, а также при пагинации'))
         self.client.force_login(self.user)
-        resp = self.client.get(f'{reverse("favorite")}/?tag=lunch')
+        for i in range(1, 3):
+            self.client.post(
+                reverse('favorite'), data={'id': f'{i}'},
+                content_type='application/json')
+        resp = self.client.get(f'{reverse("favorite")}?tag=lunch')
         self.assertNotIn(
             tag, resp.content.decode(),
             msg='Фильтры должны правильно работать на странице с избранным')
+        # print(resp.status_code)
 
 
 class TestProfile(TestCase):
