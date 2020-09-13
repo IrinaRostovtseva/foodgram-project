@@ -1,12 +1,11 @@
 import json
 from urllib.parse import unquote
 
-from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator
 from django.db.models import Sum
-from django.http import FileResponse, HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.decorators import method_decorator
 from django.views import View
@@ -309,9 +308,10 @@ def new_recipe(request):
 @require_GET
 def get_ingredients(request):
     query = unquote(request.GET.get('query'))
-    ingredients = Product.objects.filter(title__startswith=query)
-    data = [{'title': ingredient.title, 'dimension': ingredient.unit}
-            for ingredient in ingredients]
+    data = list(Product.objects.filter(
+        title__startswith=query
+    ).values(
+        'title', 'unit'))
     return JsonResponse(data, safe=False)
 
 
