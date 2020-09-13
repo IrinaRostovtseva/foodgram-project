@@ -3,8 +3,6 @@ from urllib.parse import unquote
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import (require_GET, require_http_methods,
-                                            require_POST)
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator
 from django.db.models import Sum
@@ -12,11 +10,25 @@ from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.decorators import method_decorator
 from django.views import View
+from django.views.decorators.http import (require_GET, require_http_methods,
+                                          require_POST)
 from users.models import Subscription
 
-from .create_file import write_into_file
 from .forms import RecipeForm
 from .models import Favorite, Ingredient, Product, Purchase, Recipe, Tag, User
+
+
+def _extend_context(context, user):
+    context['purchase_list'] = Purchase.purchase.get_purchases_list(user)
+    context['favorites'] = Favorite.favorite.get_favorites(user)
+    return context
+
+
+def _add_subscription_status(context, user, author):
+    context['is_subscribed'] = Subscription.objects.filter(
+        user=user, author=author
+    ).exists()
+    return context
 
 
 @require_GET
@@ -34,8 +46,7 @@ def index(request):
     user = request.user
     if user.is_authenticated:
         context['active'] = 'recipe'
-        context['purchase_list'] = Purchase.purchase.get_purchases_list(user)
-        context['favorites'] = Favorite.favorite.get_favorites(user)
+        _extend_context(context, user)
     return render(request, 'index.html', context)
 
 
@@ -57,10 +68,8 @@ def profile(request, user_id):
     # покупок и избранное
     user = request.user
     if user.is_authenticated:
-        context['is_subscribed'] = Subscription.objects.filter(
-            user=request.user, author=profile).exists()
-        context['purchase_list'] = Purchase.purchase.get_purchases_list(user)
-        context['favorites'] = Favorite.favorite.get_favorites(user)
+        _add_subscription_status(context, user, profile)
+        _extend_context(context, user)
     return render(request, 'profile.html', context)
 
 
@@ -73,21 +82,8 @@ def recipe_detail(request, recipe_id):
     }
     user = request.user
     if user.is_authenticated:
-        is_subscribed = Subscription.objects.filter(
-            user=user, author=author).exists()
-        try:
-            is_favorite = Favorite.favorite.get(
-                user=user).recipes.filter(id=recipe_id).exists()
-        except ObjectDoesNotExist:
-            is_favorite = False
-        try:
-            is_purchased = Purchase.purchase.get(
-                user=user).recipes.filter(id=recipe_id).exists()
-        except ObjectDoesNotExist:
-            is_purchased = False
-        context['is_subscribed'] = is_subscribed
-        context['is_favorite'] = is_favorite
-        context['is_purchased'] = is_purchased
+        _add_subscription_status(context, user, author)
+        _extend_context(context, user)
     return render(request, 'recipe_detail.html', context)
 
 
@@ -154,7 +150,9 @@ def delete_favorite(request, recipe_id):
 def get_subscriptions(request):
     auth_user = get_object_or_404(User, username=request.user.username)
     try:
-        subscriptions = Subscription.objects.filter(user=auth_user)
+        subscriptions = Subscription.objects.filter(
+            user=auth_user
+        ).order_by('pk')
     except ObjectDoesNotExist:
         subscriptions = []
     page_num = request.GET.get('page')
@@ -172,30 +170,24 @@ def get_subscriptions(request):
 @require_POST
 def subscription(request):
     json_data = json.loads(request.body.decode())
-    auth_user = get_object_or_404(User, username=request.user.username)
-    author_id = int(json_data['id'])
-    author = get_object_or_404(User, id=author_id)
+    author = get_object_or_404(User, id=json_data['id'])
     is_exist = Subscription.objects.filter(
-        user=auth_user, author=author).exists()
+        user=request.user, author=author).exists()
     data = {'success': 'true'}
     if is_exist:
         data['success'] = 'false'
     else:
-        Subscription.objects.create(user=auth_user, author=author)
+        Subscription.objects.create(user=request.user, author=author)
     return JsonResponse(data)
 
 
 @login_required(login_url='auth/login/')
 @require_http_methods('DELETE')
 def delete_subscription(request, author_id):
-    auth_user = get_object_or_404(User, id=request.user.id)
     author = get_object_or_404(User, id=author_id)
     data = {'success': 'true'}
-    try:
-        follow = Subscription.objects.filter(
-            user=auth_user, author=author)
-    except ObjectDoesNotExist:
-        data['success'] = 'false'
+    follow = Subscription.objects.filter(
+        user=request.user, author=author)
     if not follow:
         data['success'] = 'false'
     follow.delete()
@@ -224,10 +216,9 @@ class PurchaseView(View):
 
     def post(self, request):
         json_data = json.loads(request.body.decode())
-        recipe_id = int(json_data['id'])
-        user = get_object_or_404(User, id=request.user.id)
+        recipe_id = json_data['id']
         recipe = get_object_or_404(Recipe, id=recipe_id)
-        purchase = Purchase.purchase.get_user_purchase(user=user)
+        purchase = Purchase.purchase.get_user_purchase(user=request.user)
         data = {
             'success': 'true'
         }
@@ -259,16 +250,22 @@ def delete_purchase(request, recipe_id):
 @require_GET
 def send_shop_list(request):
     user = request.user
-    ingredients = (Ingredient.objects
-                   .select_related('ingredient')
-                   .filter(recipe__purchase__user=user)
-                   .values('ingredient__title', 'ingredient__unit')
-                   .annotate(Sum('amount'))
-                   )
-    filename = f'{settings.MEDIA_ROOT}/shoplists/{user.id}_list.txt'
-    write_into_file(filename, ingredients)
-    shop_file = open(filename, 'rb')
-    return FileResponse(shop_file, as_attachment=True)
+    ingredients = Ingredient.objects.select_related(
+        'ingredient'
+    ).filter(
+        recipe__purchase__user=user
+    ).values(
+        'ingredient__title', 'ingredient__unit'
+    ).annotate(total=Sum('amount'))
+    filename = f'{user.username}_list.txt'
+    products = [
+        (f'+ {i["ingredient__title"]} ({i["ingredient__unit"]}) -'
+         f' {i["total"]}')
+        for i in ingredients]
+    content = '  Продукт (единицы) - количество \n \n' + '\n'.join(products)
+    response = HttpResponse(content, content_type='text/plain')
+    response['Content-Disposition'] = f'attachment; filename={filename}'
+    return response
 
 
 @login_required(login_url='auth/login/')
