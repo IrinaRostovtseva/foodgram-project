@@ -10,7 +10,7 @@ services:
     image: postgres:12
     volumes:
       - postgres_data:/var/lib/postgresql/data/
-    enviroment:
+    environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
   nginx:
@@ -25,7 +25,7 @@ services:
       - static_data:/static
       - media_data:/media
   web:
-    image: rosiral/foodgram
+    build: .
     expose:
       - "8000" 
     depends_on:
