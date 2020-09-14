@@ -20,7 +20,7 @@ jobs:
         pip install -r requirements.txt
 
     - name: Lint with flake8
-      run: flake8 foodgram --exclude=recipes/migrations/,users/migrations/
+      run: flake8 . --exclude=recipes/migrations/,users/migrations/
 
     - name: Run tests
       run: ./manage.py test
