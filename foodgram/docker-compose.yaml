@@ -26,7 +26,6 @@ services:
       - media_data:/media
   web:
     image: rosiral/foodgram
-    restart: always
     expose:
       - "8000" 
     depends_on:
