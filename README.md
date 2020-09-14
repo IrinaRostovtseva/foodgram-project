@@ -7,21 +7,40 @@ Foodgram - онлайн-сервис, где пользователи смогу
 
 ## Требования
 
-+  python 3.7+
-+  pip
-+  venv
++  Docker
 
-## Начало работы
+## Разворачивание проекта на сервере
 
-1. Создайте и активируйте виртуальное окружение
+1.  Склонируйте проект
 
-        python3 -m venv <имя-виртуального-окружения>
-        . <имя-виртуального-окружения>/bin/activate
+2.  В корневой директории проекта создайте файл .env со следующим содержимым:
 
-2. Установите зависимости проекта
+        DB_ENGINE=django.db.backends.postgresql
+        DB_NAME=<название-бд>
+        DB_USER=<имя-пользователя-бд>
+        DB_PASSWORD=<пароль-к-бд>
+        DB_HOST=db
+        DB_PORT=5432
+        POSTGRES_USER=<имя-пользователя-бд-postgresql>
+        POSTGRES_PASSWORD=<пароль-к-бд-postgresql>
+        EMAIL_HOST=smtp.<email-домен>
+        EMAIL_PORT=587
+        EMAIL_HOST_USER=<yourusername@youremail.com>
+        EMAIL_HOST_PASSWORD=<пароль>
 
-        pip3 install -r foodgram/requirements.txt
 
-3. Перейдите в директорию foodgram и выполните миграции с заполнением таблицы ингредиентов
+3.  Создайте контейнеры для сервера базы данных и приложения YaMDb
+
+        docker-compose up
+
+4.  Зайдите в контейнер приложения
+
+        docker exec -it <CONTAINER_ID> bash
+
+5.  Выполните миграции
 
         ./manage.py migrate
+
+6.  Создайте суперпользователя
+
+        ./manage.py createsuperuser
