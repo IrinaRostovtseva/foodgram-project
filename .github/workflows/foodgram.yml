@@ -41,4 +41,5 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
           repository: rosiral/foodgram
+          file: foodgram/Dockerfile
           tag_with_ref: true

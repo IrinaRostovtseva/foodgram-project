@@ -10,8 +10,9 @@ services:
     image: postgres:12
     volumes:
       - postgres_data:/var/lib/postgresql/data/
-    env_file:
-      - ./.env
+    enviroment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
   nginx:
     image: nginx:1.19
     restart: always
