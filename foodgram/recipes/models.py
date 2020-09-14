@@ -7,15 +7,15 @@ User = get_user_model()
 
 
 class Product(models.Model):
-    title = models.CharField(max_length=50, verbose_name='Название продукта')
-    unit = models.CharField(max_length=10, verbose_name='Единицы измерения')
+    title = models.CharField(max_length=255, verbose_name='Название продукта')
+    unit = models.CharField(max_length=255, verbose_name='Единицы измерения')
 
     def __str__(self):
         return f'{self.title}, {self.unit}'
 
 
 class Tag(models.Model):
-    name = models.CharField(max_length=10, verbose_name='Название тега')
+    name = models.CharField(max_length=100, verbose_name='Название тега')
     slug = models.SlugField(verbose_name='Слаг тега')
 
     def __str__(self):
@@ -40,7 +40,7 @@ class Recipe(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE,
                                verbose_name='Автор рецепта',
                                related_name='recipe_author')
-    name = models.CharField(max_length=100, verbose_name='Название рецепта')
+    name = models.CharField(max_length=255, verbose_name='Название рецепта')
     description = models.TextField(verbose_name='Описание рецепта')
     image = models.ImageField(upload_to='recipes/',
                               verbose_name='Изображение блюда')

@@ -25,15 +25,15 @@ class Migration(migrations.Migration):
             name='Product',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('title', models.CharField(max_length=50, verbose_name='Название продукта')),
-                ('unit', models.CharField(max_length=10, verbose_name='Единицы измерения')),
+                ('title', models.CharField(max_length=255, verbose_name='Название продукта')),
+                ('unit', models.CharField(max_length=255, verbose_name='Единицы измерения')),
             ],
         ),
         migrations.CreateModel(
             name='Tag',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=10, verbose_name='Название тега')),
+                ('name', models.CharField(max_length=100, verbose_name='Название тега')),
                 ('slug', models.SlugField(verbose_name='Слаг тега')),
             ],
         ),
@@ -41,7 +41,7 @@ class Migration(migrations.Migration):
             name='Recipe',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=100, verbose_name='Название рецепта')),
+                ('name', models.CharField(max_length=255, verbose_name='Название рецепта')),
                 ('description', models.TextField(verbose_name='Описание рецепта')),
                 ('image', models.ImageField(upload_to='recipes/', verbose_name='Изображение блюда')),
                 ('cook_time', models.IntegerField(verbose_name='Время приготовления')),

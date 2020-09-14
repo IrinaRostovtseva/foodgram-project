@@ -280,7 +280,7 @@ class TestFavoritePage(TestCase):
 
     def test_not_auth_user(self):
         response = self.client.get(reverse('favorite'), follow=True)
-        redirect_url = f'/{response.redirect_chain[0][0].split("?")[0]}/'
+        redirect_url = f'{response.redirect_chain[0][0].split("?")[0]}/'
         self.assertEqual(
             reverse('login'), redirect_url,
             msg=('GET-запрос на страницу избранного для неавторизованного'
@@ -327,7 +327,7 @@ class TestSubscriptionPage(TestCase):
 
     def test_not_auth_user(self):
         response = self.client.get(reverse('my_subscriptions'), follow=True)
-        redirect_url = '/' + response.redirect_chain[0][0].split('?')[0]
+        redirect_url = response.redirect_chain[0][0].split('?')[0]
         self.assertEqual(
             reverse('login'), redirect_url,
             msg=('GET-запрос на страницу подписок неавторизованного'
@@ -368,7 +368,7 @@ class TestPurchasePage(TestCase):
 
     def test_not_auth_user(self):
         response = self.client.get(reverse('purchases'), follow=True)
-        redirect_url = '/' + response.redirect_chain[0][0].split('?')[0] + '/'
+        redirect_url = response.redirect_chain[0][0].split('?')[0] + '/'
         self.assertEqual(
             reverse('login'), redirect_url,
             msg=('GET-запрос на страницу покупок должен неавторизованного'
@@ -396,7 +396,7 @@ class TestIngredientQuery(TestCase):
 
     def test_not_auth_user(self):
         response = self.client.get('/ingredients?query=хл', follow=True)
-        redirect_url = '/' + response.redirect_chain[0][0].split('?')[0]
+        redirect_url = response.redirect_chain[0][0].split('?')[0]
         self.assertEqual(
             reverse('login'), redirect_url,
             msg=('GET-запрос ингредиента должен неавторизованного'
@@ -438,16 +438,16 @@ class TestFavoriteButton(TestCase):
         response = self.client.post(
             reverse('favorite'), data=self.data,
             content_type='application/json', follow=True)
-        redicrect_url = f"/{response.redirect_chain[0][0].split('?')[0]}/"
+        redirect_url = f"{response.redirect_chain[0][0].split('?')[0]}/"
         self.assertEqual(
-            reverse('login'), redicrect_url,
+            reverse('login'), redirect_url,
             msg=('Запрос на добавление в избранное должен неавторизованного'
                  ' юзера перенаправлять на страницу входа'))
         response = self.client.delete(
             reverse('delete_favorite', args=[self.recipe.id]),
             content_type='application/json', follow=True)
         self.assertEqual(
-            reverse('login'), redicrect_url,
+            reverse('login'), redirect_url,
             msg=('Запрос на удаление из избранного должен неавторизованного'
                  ' юзера направлять на страницу входа'))
 
@@ -521,16 +521,16 @@ class TestSubscriptionButton(TestCase):
         response = self.client.post(
             reverse('subscription'), data=self.data,
             content_type='application/json', follow=True)
-        redicrect_url = f"/{response.redirect_chain[0][0].split('?')[0]}"
+        redirect_url = f"{response.redirect_chain[0][0].split('?')[0]}"
         self.assertEqual(
-            reverse('login'), redicrect_url,
+            reverse('login'), redirect_url,
             msg=('Запрос на добавление в подписки должно неавторизованного'
                  ' юзера направлять на страницу входа'))
         response = self.client.delete(
             reverse('delete_subscription', args=[self.user2.id]),
             content_type='application/json', follow=True)
         self.assertEqual(
-            reverse('login'), redicrect_url,
+            reverse('login'), redirect_url,
             msg=('Запрос на удаление из подписки должен неавторизованного'
                  ' юзера направлять на страницу входа'))
 
@@ -602,16 +602,16 @@ class TestPurchaseButton(TestCase):
         response = self.client.post(
             reverse('purchases'), data=self.data,
             content_type='application/json', follow=True)
-        redicrect_url = f"/{response.redirect_chain[0][0].split('?')[0]}/"
+        redirect_url = f"{response.redirect_chain[0][0].split('?')[0]}/"
         self.assertEqual(
-            reverse('login'), redicrect_url,
+            reverse('login'), redirect_url,
             msg=('Запрос на добавление в покупки должен неавторизованного'
                  ' юзера направлять на страницу входа'))
         response = self.client.delete(
             reverse('delete_purchase', args=[self.recipe.id]),
             content_type='application/json', follow=True)
         self.assertEqual(
-            reverse('login'), redicrect_url,
+            reverse('login'), redirect_url,
             msg=('Запросе на удаление из покупок должен неавторизованного'
                  ' юзера направлять на страницу входа'))
 
