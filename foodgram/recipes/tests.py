@@ -327,7 +327,7 @@ class TestSubscriptionPage(TestCase):
 
     def test_not_auth_user(self):
         response = self.client.get(reverse('my_subscriptions'), follow=True)
-        redirect_url = response.redirect_chain[0][0].split('?')[0]
+        redirect_url = f'/{response.redirect_chain[0][0].split("?")[0]}'
         self.assertEqual(
             reverse('login'), redirect_url,
             msg=('GET-запрос на страницу подписок неавторизованного'
@@ -396,7 +396,7 @@ class TestIngredientQuery(TestCase):
 
     def test_not_auth_user(self):
         response = self.client.get('/ingredients?query=хл', follow=True)
-        redirect_url = response.redirect_chain[0][0].split('?')[0]
+        redirect_url = f'/{response.redirect_chain[0][0].split("?")[0]}'
         self.assertEqual(
             reverse('login'), redirect_url,
             msg=('GET-запрос ингредиента должен неавторизованного'
@@ -521,7 +521,7 @@ class TestSubscriptionButton(TestCase):
         response = self.client.post(
             reverse('subscription'), data=self.data,
             content_type='application/json', follow=True)
-        redirect_url = f"{response.redirect_chain[0][0].split('?')[0]}"
+        redirect_url = f"/{response.redirect_chain[0][0].split('?')[0]}"
         self.assertEqual(
             reverse('login'), redirect_url,
             msg=('Запрос на добавление в подписки должно неавторизованного'
