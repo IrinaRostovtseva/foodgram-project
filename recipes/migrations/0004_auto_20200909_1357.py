@@ -17,6 +17,19 @@ def write_ingredients(apps, schema_editor):
         Product.objects.bulk_create(products)
 
 
+def write_tags(apps, schema_editor):
+    Tag = apps.get_model('recipes.Tag')
+    tag_names = {
+        'breakfast': 'завтрак',
+        'lunch': 'обед',
+        'dinner': 'ужин'
+    }
+    tags = []
+    for key in tag_names:
+        tags.append(Tag(slug=key, name=tag_names[key]))
+    Tag.objects.bulk_create(tags)
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -24,5 +37,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(write_ingredients)
+        migrations.RunPython(write_ingredients),
+        migrations.RunPython(write_tags),
     ]
